@@ -85,3 +85,117 @@ func TestGetSet(t *testing.T) {
 		return
 	}
 }
+
+func TestWatch(t *testing.T) {
+	sess := New()
+	defer sess.Close()
+
+	stop := make(chan struct{})
+	defer close(stop)
+
+	// set stuff randomly before monitor
+	sess.Set("hello_world", 2)
+	sess.Getset("hello_world", 2)
+	sess.Setexp("hello_world", 2, time.Now().Add(1*time.Second))
+	sess.Set("hello_world", 2)
+
+	p1 := make(chan int, 1)
+	go func() {
+		monitor := sess.Watch(stop)
+		p1 <- 1
+		for _ = range monitor {
+			p1 <- 1
+		}
+	}()
+
+	p2 := make(chan int, 1)
+	go func() {
+		monitor := sess.Watch(stop)
+		p2 <- 1
+		for _ = range monitor {
+			p2 <- 1
+		}
+	}()
+
+	_, _ = <-p1, <-p2 // wait for monitor process
+
+	sess.Set("hello_world", 2)
+
+	sess.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
+
+	sess.Get("hello_internet")
+
+	sess.Getset("hello_world", 3)
+
+	woe := time.After(5 * time.Second)
+	for idx := 0; idx < 12; {
+		select {
+		case <-p1:
+			idx += 1
+		case <-p2:
+			idx += 1
+
+		case <-woe:
+			t.Errorf("unable to complete: expected events incomplete")
+			return
+		}
+	}
+}
+
+func TestWatchExtended(t *testing.T) {
+	sess := New()
+	defer sess.Close()
+
+	stop := make(chan struct{})
+	p1 := make(chan int, 1)
+	go func() {
+		monitor := sess.Watch(stop)
+		p1 <- 1
+		for _ = range monitor {
+			p1 <- 1
+		}
+	}()
+
+	later := make(chan struct{})
+	p2 := make(chan int, 1)
+	go func() {
+		monitor := sess.Watch(later)
+		p2 <- 1
+		for _ = range monitor {
+			p2 <- 1
+		}
+	}()
+
+	_, _ = <-p1, <-p2 // wait for monitor process
+
+	sess.Set("hello_world", 2)
+
+	sess.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
+
+	sess.Get("hello_internet")
+
+	sess.Getset("hello_world", 3)
+
+	close(stop) // kill the firs monitor prematruely
+
+	woe := time.After(5 * time.Second)
+	for idx1, idx2 := 0, 0; idx2 < 6; {
+		select {
+		case <-p1:
+			idx1 += 1
+			if idx1 > 5 {
+				t.Errorf("monitor 1 returned more then expected")
+				return
+			}
+
+		case <-p2:
+			idx2 += 1
+
+		case <-woe:
+			t.Errorf("unable to complete: expected events incomplete")
+			return
+		}
+	}
+
+	close(later) // kill the second monitor
+}
