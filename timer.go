@@ -49,7 +49,7 @@ func (t *Timer) dispatch() {
 	now := time.Now()
 	for ok := true; ok; {
 		if len(t.pq) > 0 && now.After(t.pq[0].a) {
-			job := heap.Remove(&t.pq, 0).(*ticket)
+			job := heap.Pop(&t.pq).(*ticket)
 			if t.pop(job.iden) {
 				go job.h.Done() // fire the worker on timer
 			}
