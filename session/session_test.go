@@ -17,7 +17,7 @@ func TestSessionStore(t *testing.T) {
 
 	x := sess.Get("hello_internet").(int)
 	if x != 1 {
-		t.Errorf("invalid value for stroed key world: \"hello_internet\"")
+		t.Errorf("invalid value for stroed key word: \"hello_internet\"")
 		return
 	}
 
@@ -25,7 +25,7 @@ func TestSessionStore(t *testing.T) {
 
 	y := sess.Get("hello_world")
 	if y != nil {
-		t.Errorf("unable to delete stored key world: \"hello_world\"")
+		t.Errorf("unable to delete stored key word: \"hello_world\"")
 		return
 	}
 }
@@ -42,18 +42,18 @@ func TestExpire(t *testing.T) {
 
 	x := sess.Get("hello_internet")
 	if x != nil {
-		t.Errorf("key world: \"hello_internet\" not expired")
+		t.Errorf("key word: \"hello_internet\" not expired")
 		return
 	}
 
 	y := sess.Get("hello_world").(int)
 	if y != 2 {
-		t.Errorf("key world: \"hello_world\" unexpected get failure")
+		t.Errorf("key word: \"hello_world\" unexpected get failure")
 		return
 	}
 
 	if !sess.Expire("hello_world", time.Now().Add(1*time.Second)) {
-		t.Errorf("key world: \"hello_world\" missing")
+		t.Errorf("key word: \"hello_world\" missing")
 		return
 	}
 
@@ -61,7 +61,7 @@ func TestExpire(t *testing.T) {
 
 	z := sess.Get("hello_world")
 	if z != nil {
-		t.Errorf("key world: \"hello_world\" not expired")
+		t.Errorf("key word: \"hello_world\" not expired")
 		return
 	}
 }
@@ -78,12 +78,12 @@ func TestGetSet(t *testing.T) {
 
 	x := sess.Get("hello_internet")
 	if x == nil {
-		t.Errorf("key world: \"hello_internet\" unexpected expire")
+		t.Errorf("key word: \"hello_internet\" unexpected expire")
 		return
 	}
 
 	if x.(int) != 2 {
-		t.Errorf("key world: \"hello_internet\" holds invalid value")
+		t.Errorf("key word: \"hello_internet\" holds invalid value")
 		return
 	}
 }
@@ -97,12 +97,12 @@ func TestAcquireTTL(t *testing.T) {
 	sess.Set("hello_world", 1)
 
 	if sess.TTL("hello_internet") == 0 {
-		t.Errorf("key world: \"hello_internet\" holds invalid expire time")
+		t.Errorf("key word: \"hello_internet\" holds invalid expire time")
 		return
 	}
 
 	if sess.TTL("hello_world") != 0 {
-		t.Errorf("key world: \"hello_world\" holds expire time")
+		t.Errorf("key word: \"hello_world\" holds expire time")
 	}
 }
 
