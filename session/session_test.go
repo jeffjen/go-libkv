@@ -2,6 +2,8 @@ package session
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 )
@@ -83,6 +85,52 @@ func TestGetSet(t *testing.T) {
 	if x.(int) != 2 {
 		t.Errorf("key world: \"hello_internet\" holds invalid value")
 		return
+	}
+}
+
+func TestList(t *testing.T) {
+	sess := New()
+	defer sess.Close()
+
+	const N = 10
+
+	for idx := 0; idx < N; idx++ {
+		sess.Set(fmt.Sprint(idx), idx)
+	}
+
+	k := sess.List()
+	if len(k) != N {
+		t.Errorf("unable to list keys stored")
+	} else {
+		fmt.Println(k)
+	}
+}
+
+func TestListexp(t *testing.T) {
+	sess := New()
+	defer sess.Close()
+
+	const N = 100
+
+	var exp_k = []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
+
+	now := time.Now().Add(2 * time.Second)
+
+	for idx, k := range exp_k {
+		sess.Setexp(k, idx, now)
+	}
+	for idx := N; idx < 10+N; idx++ {
+		sess.Set(fmt.Sprint(idx), idx)
+	}
+
+	k := sess.Listexp()
+
+	sort.Strings(k)
+
+	if !reflect.DeepEqual(k, exp_k) {
+		t.Errorf("unexpected exp keys mismatch")
+	} else {
+		fmt.Println(k)
 	}
 }
 

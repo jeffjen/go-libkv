@@ -183,3 +183,27 @@ func (s *Session) Watch(stop chan struct{}) <-chan *Event {
 	}()
 	return output
 }
+
+func (s *Session) List() (items []string) {
+	s.RLock()
+	defer s.RUnlock()
+	items = make([]string, len(s.m.store))
+	idx := 0
+	for k, _ := range s.m.store {
+		items[idx] = k
+		idx++
+	}
+	return
+}
+
+func (s *Session) Listexp() (items []string) {
+	s.RLock()
+	defer s.RUnlock()
+	items = make([]string, len(s.m.index))
+	idx := 0
+	for k, _ := range s.m.index {
+		items[idx] = k
+		idx++
+	}
+	return
+}
