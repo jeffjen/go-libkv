@@ -1,4 +1,5 @@
 # go-timer
+[![license](http://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/jeffjen/go-timer/master/LICENSE)
 [![Build Status](https://travis-ci.org/jeffjen/go-timer.svg?branch=master)](https://travis-ci.org/jeffjen/go-timer)
 
 A framework for handling time based resource management
