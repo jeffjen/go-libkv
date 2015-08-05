@@ -128,12 +128,14 @@ func TestWatch(t *testing.T) {
 	sess.Getset("hello_world", 3)
 
 	woe := time.After(5 * time.Second)
-	for idx := 0; idx < 12; {
+	for idx1, ok1, idx2, ok2 := 0, true, 0, true; ok1 || ok2; {
 		select {
 		case <-p1:
-			idx += 1
+			idx1 += 1
+			ok1 = !(idx1 == 7)
 		case <-p2:
-			idx += 1
+			idx2 += 1
+			ok2 = !(idx2 == 7)
 
 		case <-woe:
 			t.Errorf("unable to complete: expected events incomplete")
@@ -179,7 +181,7 @@ func TestWatchExtended(t *testing.T) {
 	close(stop) // kill the firs monitor prematruely
 
 	woe := time.After(5 * time.Second)
-	for idx1, idx2 := 0, 0; idx2 < 6; {
+	for idx1, idx2, ok := 0, 0, true; ok; {
 		select {
 		case <-p1:
 			idx1 += 1
@@ -190,6 +192,7 @@ func TestWatchExtended(t *testing.T) {
 
 		case <-p2:
 			idx2 += 1
+			ok = !(idx2 == 7)
 
 		case <-woe:
 			t.Errorf("unable to complete: expected events incomplete")

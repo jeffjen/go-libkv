@@ -10,6 +10,7 @@ const (
 	GET int = iota
 	SET
 	DEL
+	EXPIRE
 )
 
 type Event struct {
@@ -107,7 +108,10 @@ func (s *Session) set(iden string, x interface{}, exp *time.Time) bool {
 	s.m.store[iden] = x
 	if exp != nil {
 		id := iden
-		s.m.index[iden] = s.e.SchedFunc(*exp, func() { s.del(id) })
+		s.m.index[iden] = s.e.SchedFunc(*exp, func() {
+			s.del(id)
+			s.s.src <- &Event{EXPIRE, iden}
+		})
 	}
 	s.s.src <- &Event{SET, iden}
 	return true
