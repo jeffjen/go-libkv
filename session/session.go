@@ -32,12 +32,17 @@ type session_avent struct {
 	counter int64
 }
 
+type thing struct {
+	x interface{}
+	t *time.Time
+}
+
 type Session struct {
 	sync.RWMutex
 
 	e *expire.Timer
 	m struct {
-		store map[string]interface{}
+		store map[string]thing
 		index map[string]int64
 	}
 	s *session_avent
@@ -70,10 +75,10 @@ func New() (s *Session) {
 	s = &Session{
 		e: expire.NewTimer(),
 		m: struct {
-			store map[string]interface{}
+			store map[string]thing
 			index map[string]int64
 		}{
-			store: make(map[string]interface{}),
+			store: make(map[string]thing),
 			index: make(map[string]int64),
 		},
 		s: &session_avent{
@@ -105,7 +110,7 @@ func (s *Session) set(iden string, x interface{}, exp *time.Time) bool {
 	if idx, ok := s.m.index[iden]; ok {
 		s.e.Cancel(idx)
 	}
-	s.m.store[iden] = x
+	s.m.store[iden] = thing{x: x, t: exp}
 	if exp != nil {
 		id := iden
 		s.m.index[iden] = s.e.SchedFunc(*exp, func() {
@@ -128,14 +133,28 @@ func (s *Session) Setexp(iden string, x interface{}, exp time.Time) bool {
 func (s *Session) Get(iden string) (x interface{}) {
 	s.RLock()
 	defer s.RUnlock()
-	x = s.m.store[iden]
-	s.s.src <- &Event{GET, iden}
+	if obj, ok := s.m.store[iden]; ok {
+		x = obj.x
+		s.s.src <- &Event{GET, iden}
+	}
 	return
 }
 
 func (s *Session) Getset(iden string, x interface{}) (y interface{}) {
 	y = s.Get(iden)
 	s.Set(iden, x)
+	return
+}
+
+func (s *Session) TTL(iden string) (in time.Duration) {
+	s.RLock()
+	defer s.RUnlock()
+	if obj, ok := s.m.store[iden]; ok && obj.t != nil {
+		in = obj.t.Sub(time.Now())
+		if in < 0 {
+			in = time.Duration(0)
+		}
+	}
 	return
 }
 

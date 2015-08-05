@@ -88,6 +88,24 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
+func TestAcquireTTL(t *testing.T) {
+	sess := New()
+	defer sess.Close()
+
+	sess.Setexp("hello_internet", 1, time.Now().Add(5*time.Second))
+
+	sess.Set("hello_world", 1)
+
+	if sess.TTL("hello_internet") == 0 {
+		t.Errorf("key world: \"hello_internet\" holds invalid expire time")
+		return
+	}
+
+	if sess.TTL("hello_world") != 0 {
+		t.Errorf("key world: \"hello_world\" holds expire time")
+	}
+}
+
 func TestList(t *testing.T) {
 	sess := New()
 	defer sess.Close()
