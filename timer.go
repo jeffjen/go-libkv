@@ -73,9 +73,9 @@ func (t *Timer) Tic() {
 
 	go func() {
 		defer wg.Done()
+		var alarm <-chan time.Time
 		for yay := true; yay; {
 			// determine the closest future about to happen
-			var alarm <-chan time.Time
 			if len(t.pq) == 0 {
 				alarm = time.After(1 * time.Hour)
 			} else {
@@ -84,7 +84,7 @@ func (t *Timer) Tic() {
 					t.dispatch()
 					continue
 				}
-				alarm = time.Tick(t.pq[0].a.Sub(time.Now()))
+				alarm = time.After(diff)
 			}
 
 			select {
