@@ -157,3 +157,20 @@ func TestUpdate(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkSchedFunc(b *testing.B) {
+	exp := NewTimer()
+
+	exp.Tic()
+	defer exp.Toc() // schedule expire worker
+
+	const N = 10000
+
+	handle := func() {}
+
+	future := time.Now().Add(1 * time.Hour)
+
+	for idx := 0; idx < N; idx++ {
+		exp.SchedFunc(future, handle)
+	}
+}
