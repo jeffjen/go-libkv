@@ -20,5 +20,7 @@ Supported operations
 - Get
 - Getset
 - Expire
+- TTL
 - Del
+- List, Listexp
 - Watch
