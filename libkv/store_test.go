@@ -1,4 +1,4 @@
-package session
+package libkv
 
 import (
 	"fmt"
@@ -8,22 +8,22 @@ import (
 	"time"
 )
 
-func TestSessionStore(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+func TestStore(t *testing.T) {
+	kv := NewStore()
+	defer kv.Close()
 
-	sess.Set("hello_internet", 1)
-	sess.Set("hello_world", func() { fmt.Println("hello human") })
+	kv.Set("hello_internet", 1)
+	kv.Set("hello_world", func() { fmt.Println("hello human") })
 
-	x := sess.Get("hello_internet").(int)
+	x := kv.Get("hello_internet").(int)
 	if x != 1 {
 		t.Errorf("invalid value for stroed key word: \"hello_internet\"")
 		return
 	}
 
-	sess.Del("hello_world")
+	kv.Del("hello_world")
 
-	y := sess.Get("hello_world")
+	y := kv.Get("hello_world")
 	if y != nil {
 		t.Errorf("unable to delete stored key word: \"hello_world\"")
 		return
@@ -31,35 +31,35 @@ func TestSessionStore(t *testing.T) {
 }
 
 func TestExpire(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+	kv := NewStore()
+	defer kv.Close()
 
-	sess.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
+	kv.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
 
-	sess.Set("hello_world", 2)
+	kv.Set("hello_world", 2)
 
 	time.Sleep(2 * time.Second)
 
-	x := sess.Get("hello_internet")
+	x := kv.Get("hello_internet")
 	if x != nil {
 		t.Errorf("key word: \"hello_internet\" not expired")
 		return
 	}
 
-	y := sess.Get("hello_world").(int)
+	y := kv.Get("hello_world").(int)
 	if y != 2 {
 		t.Errorf("key word: \"hello_world\" unexpected get failure")
 		return
 	}
 
-	if !sess.Expire("hello_world", time.Now().Add(1*time.Second)) {
+	if !kv.Expire("hello_world", time.Now().Add(1*time.Second)) {
 		t.Errorf("key word: \"hello_world\" missing")
 		return
 	}
 
 	time.Sleep(2 * time.Second)
 
-	z := sess.Get("hello_world")
+	z := kv.Get("hello_world")
 	if z != nil {
 		t.Errorf("key word: \"hello_world\" not expired")
 		return
@@ -67,16 +67,16 @@ func TestExpire(t *testing.T) {
 }
 
 func TestGetSet(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+	kv := NewStore()
+	defer kv.Close()
 
-	sess.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
+	kv.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
 
-	sess.Getset("hello_internet", 2)
+	kv.Getset("hello_internet", 2)
 
 	time.Sleep(1 * time.Second)
 
-	x := sess.Get("hello_internet")
+	x := kv.Get("hello_internet")
 	if x == nil {
 		t.Errorf("key word: \"hello_internet\" unexpected expire")
 		return
@@ -89,34 +89,34 @@ func TestGetSet(t *testing.T) {
 }
 
 func TestAcquireTTL(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+	kv := NewStore()
+	defer kv.Close()
 
-	sess.Setexp("hello_internet", 1, time.Now().Add(5*time.Second))
+	kv.Setexp("hello_internet", 1, time.Now().Add(5*time.Second))
 
-	sess.Set("hello_world", 1)
+	kv.Set("hello_world", 1)
 
-	if sess.TTL("hello_internet") == 0 {
+	if kv.TTL("hello_internet") == 0 {
 		t.Errorf("key word: \"hello_internet\" holds invalid expire time")
 		return
 	}
 
-	if sess.TTL("hello_world") != 0 {
+	if kv.TTL("hello_world") != 0 {
 		t.Errorf("key word: \"hello_world\" holds expire time")
 	}
 }
 
 func TestList(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+	kv := NewStore()
+	defer kv.Close()
 
 	const N = 10
 
 	for idx := 0; idx < N; idx++ {
-		sess.Set(fmt.Sprint(idx), idx)
+		kv.Set(fmt.Sprint(idx), idx)
 	}
 
-	k := sess.List()
+	k := kv.List()
 	if len(k) != N {
 		t.Errorf("unable to list keys stored")
 	} else {
@@ -125,8 +125,8 @@ func TestList(t *testing.T) {
 }
 
 func TestListexp(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+	kv := NewStore()
+	defer kv.Close()
 
 	const N = 100
 
@@ -135,13 +135,13 @@ func TestListexp(t *testing.T) {
 	now := time.Now().Add(2 * time.Second)
 
 	for idx, k := range exp_k {
-		sess.Setexp(k, idx, now)
+		kv.Setexp(k, idx, now)
 	}
 	for idx := N; idx < 10+N; idx++ {
-		sess.Set(fmt.Sprint(idx), idx)
+		kv.Set(fmt.Sprint(idx), idx)
 	}
 
-	k := sess.Listexp()
+	k := kv.Listexp()
 
 	sort.Strings(k)
 
@@ -153,21 +153,21 @@ func TestListexp(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+	kv := NewStore()
+	defer kv.Close()
 
 	stop := make(chan struct{})
 	defer close(stop)
 
 	// set stuff randomly before monitor
-	sess.Set("hello_world", 2)
-	sess.Getset("hello_world", 2)
-	sess.Setexp("hello_world", 2, time.Now().Add(1*time.Second))
-	sess.Set("hello_world", 2)
+	kv.Set("hello_world", 2)
+	kv.Getset("hello_world", 2)
+	kv.Setexp("hello_world", 2, time.Now().Add(1*time.Second))
+	kv.Set("hello_world", 2)
 
 	p1 := make(chan int, 1)
 	go func() {
-		monitor := sess.Watch(stop)
+		monitor := kv.Watch(stop)
 		p1 <- 1
 		for _ = range monitor {
 			p1 <- 1
@@ -176,7 +176,7 @@ func TestWatch(t *testing.T) {
 
 	p2 := make(chan int, 1)
 	go func() {
-		monitor := sess.Watch(stop)
+		monitor := kv.Watch(stop)
 		p2 <- 1
 		for _ = range monitor {
 			p2 <- 1
@@ -185,13 +185,13 @@ func TestWatch(t *testing.T) {
 
 	_, _ = <-p1, <-p2 // wait for monitor process
 
-	sess.Set("hello_world", 2)
+	kv.Set("hello_world", 2)
 
-	sess.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
+	kv.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
 
-	sess.Get("hello_internet")
+	kv.Get("hello_internet")
 
-	sess.Getset("hello_world", 3)
+	kv.Getset("hello_world", 3)
 
 	woe := time.After(5 * time.Second)
 	for idx1, ok1, idx2, ok2 := 0, true, 0, true; ok1 || ok2; {
@@ -211,13 +211,13 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchExtended(t *testing.T) {
-	sess := New()
-	defer sess.Close()
+	kv := NewStore()
+	defer kv.Close()
 
 	stop := make(chan struct{})
 	p1 := make(chan int, 1)
 	go func() {
-		monitor := sess.Watch(stop)
+		monitor := kv.Watch(stop)
 		p1 <- 1
 		for _ = range monitor {
 			p1 <- 1
@@ -227,7 +227,7 @@ func TestWatchExtended(t *testing.T) {
 	later := make(chan struct{})
 	p2 := make(chan int, 1)
 	go func() {
-		monitor := sess.Watch(later)
+		monitor := kv.Watch(later)
 		p2 <- 1
 		for _ = range monitor {
 			p2 <- 1
@@ -236,13 +236,13 @@ func TestWatchExtended(t *testing.T) {
 
 	_, _ = <-p1, <-p2 // wait for monitor process
 
-	sess.Set("hello_world", 2)
+	kv.Set("hello_world", 2)
 
-	sess.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
+	kv.Setexp("hello_internet", 1, time.Now().Add(1*time.Second))
 
-	sess.Get("hello_internet")
+	kv.Get("hello_internet")
 
-	sess.Getset("hello_world", 3)
+	kv.Getset("hello_world", 3)
 
 	close(stop) // kill the firs monitor prematruely
 

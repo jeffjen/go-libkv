@@ -1,19 +1,16 @@
-# go-timer
-[![license](http://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/jeffjen/go-timer/master/LICENSE)
-[![Build Status](https://travis-ci.org/jeffjen/go-timer.svg?branch=master)](https://travis-ci.org/jeffjen/go-timer)
+# go-libkv
+[![license](http://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/jeffjen/go-libkv/master/LICENSE)
+[![Build Status](https://travis-ci.org/jeffjen/go-libkv.svg?branch=master)](https://travis-ci.org/jeffjen/go-libkv)
 
-A framework for handling time based resource management
+An embedded framework for handling key value written in pure golang.
 
-## timer
+- Provides a straight forward interface for handling *volatile* key value storage
+- Added flavor for time based resource management (EXPIRE, TTL)
+- Broadcast key space event to subscribed goroutines.
 
-Schedule work to run at specific time.  It uses implementation in
-[container/heap](http://golang.org/pkg/container/heap/) to setup min-heap on
-the TTL of the scheduled item.
+## libkv
 
-## session
-
-Based on timer, I present a simple in memory volaile KV storage inspired by
-[redis](http://redis.io/).
+Embedded In memory **volatile** KV storage inspired by [REDIS](http://redis.io/).
 
 Supported operations
 
@@ -25,3 +22,9 @@ Supported operations
 - Del
 - List, Listexp
 - Watch
+
+## timer
+
+Schedule work to run at specific time.  It uses implementation in
+[container/heap](http://golang.org/pkg/container/heap/) to setup min-heap on
+the TTL of the scheduled item.
