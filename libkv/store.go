@@ -59,11 +59,8 @@ type Store struct {
 	s *kv_avent     `desc: keyspace event hub`
 }
 
-// init setups the key value storage.
-// Upon initialization, the Store spawns expiration scheduler and keyspace event hub.
-func (s *Store) init() (ok <-chan bool) {
+func (s *Store) event_hub() (ok <-chan bool) {
 	ack := make(chan bool, 1)
-	s.e.Tic()
 	go func() {
 		ack <- true
 		for yay := true; yay; {
@@ -85,6 +82,13 @@ func (s *Store) init() (ok <-chan bool) {
 		}
 	}()
 	return ack
+}
+
+// init setups the key value storage.
+// Upon initialization, the Store spawns expiration scheduler and keyspace event hub.
+func (s *Store) init() (ok <-chan bool) {
+	s.e.Tic()
+	return s.event_hub()
 }
 
 // NewStore creates a Store object.
