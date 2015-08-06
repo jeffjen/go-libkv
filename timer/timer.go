@@ -1,3 +1,5 @@
+// Package timer provides basic schedule primitives for user defined methods to
+// be engaged after set period.
 package timer
 
 import (
@@ -13,23 +15,25 @@ const (
 	STOPPED
 )
 
+// schedIdx is how we map job identifier to position in the queue.
 type schedIdx struct {
 	sync.RWMutex
 	i map[int64]int
 }
 
 type Timer struct {
-	begin int64
+	begin int64 `desc: job identifier counter`
 
-	inn    chan *ticket
-	sync   chan *ticket
-	pq     priority
-	halt   chan struct{}
-	end    chan struct{}
-	state  int
-	lookup *schedIdx
+	inn    chan *ticket  `desc: input channel for incoming job ticket`
+	sync   chan *ticket  `desc: input channel for update request`
+	pq     priority      `desc: priority queue for the scheduler`
+	halt   chan struct{} `desc: channel as stopping condition`
+	end    chan struct{} `desc: channel to wait on stop completion`
+	state  int           `desc: mark state of the Timer`
+	lookup *schedIdx     `desc: lookup table from job id to priority queue index`
 }
 
+// pop removes an item for the dispatch lookup table.
 func (t *Timer) pop(iden int64) (ack bool) {
 	t.lookup.Lock()
 	defer t.lookup.Unlock()
@@ -39,12 +43,14 @@ func (t *Timer) pop(iden int64) (ack bool) {
 	return
 }
 
+// place adds one job to the Timer object.
 func (t *Timer) place(job *ticket) {
 	t.lookup.Lock()
 	defer t.lookup.Unlock()
 	t.lookup.i[job.iden] = job.pos
 }
 
+// dispatch finds expired timer and schedule job on its own goroutine.
 func (t *Timer) dispatch() {
 	now := time.Now()
 	for ok := true; ok; {
@@ -59,6 +65,8 @@ func (t *Timer) dispatch() {
 	}
 }
 
+// Tic starts the Timer in a goroutine.
+// Accepts incoming schedudle request via SchedFunc and Sched.
 func (t *Timer) Tic() {
 	if t.state != IDLE {
 		panic(fmt.Errorf("timer must be in IDLE to Tic"))
@@ -111,6 +119,8 @@ func (t *Timer) Tic() {
 	}()
 }
 
+// Toc stops the Timer and all schedudled handler are dropped.
+// Stopped timer cannot be restarted.
 func (t *Timer) Toc() {
 	close(t.halt)
 	for _ = range t.end {
@@ -118,18 +128,25 @@ func (t *Timer) Toc() {
 	t.state = STOPPED
 }
 
+// SchedFunc accepts time.Time object and a handle function.
+// handle function is invoked in its own goroutine at designated time.
+// Returns an identifier for caller to Cancel or Update.
 func (t *Timer) SchedFunc(c time.Time, handle func()) (iden int64) {
 	t.begin, iden = t.begin+1, t.begin
 	t.inn <- &ticket{a: c, h: HandlerFunc(handle), iden: iden}
 	return
 }
 
+// Sched accepts time.Time object and a Handler interface.
+// handler is invoked in its own goroutine when at designated time.
+// Returns an identifier for caller to Cancel or Update.
 func (t *Timer) Sched(c time.Time, handle Handler) (iden int64) {
 	t.begin, iden = t.begin+1, t.begin
 	t.inn <- &ticket{a: c, h: handle, iden: iden}
 	return
 }
 
+// Update takes an identifier by SchedFunc or Sched and reschedules its TTL.
 func (t *Timer) Update(iden int64, c time.Time) {
 	t.lookup.RLock()
 	defer t.lookup.RUnlock()
@@ -140,10 +157,15 @@ func (t *Timer) Update(iden int64, c time.Time) {
 	}
 }
 
+// Cancel takes an identifier by SchedFunc or Sched and disables the handler.
+// Effectively prevents the handler to be invoked.
 func (t *Timer) Cancel(iden int64) {
 	t.pop(iden)
 }
 
+// NewTimer creates a Timer object.  Timer is initialized by not engaged.
+// To enage the Timer, invoke Tic.
+// To stop the Timer, invoke Toc.
 func NewTimer() (t *Timer) {
 	pri := make(priority, 0)
 	heap.Init(&pri)

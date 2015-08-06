@@ -4,14 +4,16 @@ import (
 	"time"
 )
 
+// ticket is job metadata.
 type ticket struct {
-	iden int64
-	pos  int
+	iden int64 `desc: uniqe identifier for a job`
+	pos  int   `desc: position in the priority queue`
 
-	a time.Time
-	h Handler
+	a time.Time `desc: the designated time to fire Handler`
+	h Handler   `desc: registered handler`
 }
 
+// priority is how we manage scheduling in Timer
 type priority []*ticket
 
 func (pri priority) Len() int { return len(pri) }
