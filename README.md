@@ -1,5 +1,6 @@
 # go-libkv
 [![license](http://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/jeffjen/go-libkv/master/LICENSE)
+[![GoDoc](https://godoc.org/github.com/jeffjen/go-libkv?status.png)](https://godoc.org/github.com/jeffjen/go-libkv)
 [![Build Status](https://travis-ci.org/jeffjen/go-libkv.svg?branch=master)](https://travis-ci.org/jeffjen/go-libkv)
 
 An embedded framework for handling key value written in pure golang.
