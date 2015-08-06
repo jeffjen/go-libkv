@@ -1,3 +1,4 @@
+// Package libkv provides key value storage for embedded go application.
 package libkv
 
 import (
@@ -13,44 +14,58 @@ const (
 	EXPIRE
 )
 
+// Event delivers keyspace changes to registerd Watcher
 type Event struct {
-	Action int
-	Iden   string
+	Action int    `desc: action taken e.g. GET, SET, EXPIRE`
+	Iden   string `desc: key that was affected`
 }
 
+// avent is a control object for Store event hub to deliver Event
 type avent struct {
-	c chan<- *Event
-	h chan struct{}
+	c chan<- *Event   `desc: channel to send the event into`
+	h <-chan struct{} `desc: control channel to indicate unregister`
 }
 
+// kv_avent is holds metadata about how to distribute keyspace Event
 type kv_avent struct {
 	sync.RWMutex
 
-	src     chan *Event
-	list    map[int64]*avent
-	halt    chan struct{}
-	counter int64
+	src     chan *Event      `desc: Event source channel from keyspace`
+	list    map[int64]*avent `desc: list of registerd party for Event`
+	halt    chan struct{}    `desc: control channel to stop Event distribution`
+	counter int64            `desc: counter to tag Watcher`
 }
 
+// thing is an object stored in Store
 type thing struct {
-	x interface{}
-	t *time.Time
+	x interface{} `desc: the object to store`
+	t *time.Time  `desc: the expiration date on this thing`
 }
 
+// store is the actual KV store
+type store struct {
+	store map[string]thing `desc: the actual KV store`
+	index map[string]int64 `desc: the index mapper for key to schdule index`
+}
+
+// Store is a simple key value in memory storage.
+// Upon initialization, Store provides general get, set, del, list operations,
+// as well as the ability to expire a key and watch a key change.
 type Store struct {
 	sync.RWMutex
 
-	e *expire.Timer
-	m struct {
-		store map[string]thing
-		index map[string]int64
-	}
-	s *kv_avent
+	e *expire.Timer `desc: scheduler for keyspace expiration`
+	m *store        `desc: the actual store`
+	s *kv_avent     `desc: keyspace event hub`
 }
 
-func (s *Store) init() {
+// init setups the key value storage.
+// Upon initialization, the Store spawns expiration scheduler and keyspace event hub.
+func (s *Store) init() (ok <-chan bool) {
+	ack := make(chan bool, 1)
 	s.e.Tic()
 	go func() {
+		ack <- true
 		for yay := true; yay; {
 			select {
 			case <-s.s.halt:
@@ -69,15 +84,15 @@ func (s *Store) init() {
 			}
 		}
 	}()
+	return ack
 }
 
+// NewStore creates a Store object.
+// Store object is fully initialzed upon creation.
 func NewStore() (s *Store) {
 	s = &Store{
 		e: expire.NewTimer(),
-		m: struct {
-			store map[string]thing
-			index map[string]int64
-		}{
+		m: &store{
 			store: make(map[string]thing),
 			index: make(map[string]int64),
 		},
@@ -87,15 +102,17 @@ func NewStore() (s *Store) {
 			halt: make(chan struct{}),
 		},
 	}
-	s.init()
+	<-s.init() // make sure both scheduler and event hub is running
 	return
 }
 
+// Close stops the Store scheduler and event hub.
 func (s *Store) Close() {
 	close(s.s.halt)
 	s.e.Toc()
 }
 
+// del removes an item from the Store keyspace
 func (s *Store) del(iden string) {
 	s.Lock()
 	defer s.Unlock()
@@ -104,6 +121,8 @@ func (s *Store) del(iden string) {
 	s.s.src <- &Event{DEL, iden}
 }
 
+// set adds an item to the Store keyspace; sets expiration handler when
+// appropriate
 func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 	s.Lock()
 	defer s.Unlock()
@@ -122,14 +141,18 @@ func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 	return true
 }
 
+// Set puts an aribtrary item x into Store identified by iden
 func (s *Store) Set(iden string, x interface{}) bool {
 	return s.set(iden, x, nil)
 }
 
+// Set puts an aribtrary item x into Store identified by iden to be expired at
+// exp
 func (s *Store) Setexp(iden string, x interface{}, exp time.Time) bool {
 	return s.set(iden, x, &exp)
 }
 
+// Get retrieves an item x identified by iden
 func (s *Store) Get(iden string) (x interface{}) {
 	s.RLock()
 	defer s.RUnlock()
@@ -140,12 +163,14 @@ func (s *Store) Get(iden string) (x interface{}) {
 	return
 }
 
+// Getset retrieves an item y identified by iden and replace it with item x
 func (s *Store) Getset(iden string, x interface{}) (y interface{}) {
 	y = s.Get(iden)
 	s.Set(iden, x)
 	return
 }
 
+// TTL reports the life time left on the item identified by iden
 func (s *Store) TTL(iden string) (in time.Duration) {
 	s.RLock()
 	defer s.RUnlock()
@@ -158,6 +183,7 @@ func (s *Store) TTL(iden string) (in time.Duration) {
 	return
 }
 
+// Expire puts item identified by iden to expire at exp
 func (s *Store) Expire(iden string, exp time.Time) bool {
 	x := s.Get(iden)
 	if x != nil {
@@ -166,10 +192,13 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 	return false
 }
 
+// Del removes the item identified by iden from Store
 func (s *Store) Del(iden string) {
 	s.del(iden)
 }
 
+// register takes a control object avent and place it into the Wather list in
+// keyspace event hub.
 func (s *Store) register(inn *avent) {
 	s.s.Lock()
 	defer s.s.Unlock()
@@ -178,7 +207,11 @@ func (s *Store) register(inn *avent) {
 	s.s.list[r] = inn
 }
 
-func (s *Store) Watch(stop chan struct{}) <-chan *Event {
+// Watch provides interested party to monitor keyspace changes.
+// A Watcher (caller of Watch function) provides a stopping condition, and gets
+// a channel for future Event in keyspace.
+// Stop a Watcher by closeing the stop channel
+func (s *Store) Watch(stop <-chan struct{}) <-chan *Event {
 	output := make(chan *Event, 8)
 	go func() {
 		defer close(output)
@@ -203,6 +236,7 @@ func (s *Store) Watch(stop chan struct{}) <-chan *Event {
 	return output
 }
 
+// List retrieves the full list of item key in Store.
 func (s *Store) List() (items []string) {
 	s.RLock()
 	defer s.RUnlock()
@@ -215,6 +249,7 @@ func (s *Store) List() (items []string) {
 	return
 }
 
+// Listexp retrieves the full list of item key in Store that has an expiration.
 func (s *Store) Listexp() (items []string) {
 	s.RLock()
 	defer s.RUnlock()
