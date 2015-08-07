@@ -206,11 +206,20 @@ func (s *Store) TTL(iden string) (in time.Duration) {
 
 // Expire puts item identified by iden to expire at exp
 func (s *Store) Expire(iden string, exp time.Time) bool {
-	x := s.get(iden)
-	if x != nil {
-		return s.set(iden, x, &exp)
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.m.store[iden]; !ok {
+		return false
+	} else {
+		id := iden
+		s.m.index[iden] = s.e.SchedFunc(exp, func() {
+			s.s.src <- &Event{GONE, iden}
+			s.del(id)
+		})
+		s.s.src <- &Event{EXPIRE, iden}
+		return true
 	}
-	return false
 }
 
 // Del removes the item identified by iden from Store
