@@ -198,10 +198,10 @@ func TestWatch(t *testing.T) {
 		select {
 		case <-p1:
 			idx1 += 1
-			ok1 = !(idx1 == 7)
+			ok1 = !(idx1 == 6)
 		case <-p2:
 			idx2 += 1
-			ok2 = !(idx2 == 7)
+			ok2 = !(idx2 == 6)
 
 		case <-woe:
 			t.Errorf("unable to complete: expected events incomplete")
@@ -251,14 +251,14 @@ func TestWatchExtended(t *testing.T) {
 		select {
 		case <-p1:
 			idx1 += 1
-			if idx1 > 5 {
+			if idx1 > 4 {
 				t.Errorf("monitor 1 returned more then expected")
 				return
 			}
 
 		case <-p2:
 			idx2 += 1
-			ok = !(idx2 == 7)
+			ok = !(idx2 == 6)
 
 		case <-woe:
 			t.Errorf("unable to complete: expected events incomplete")

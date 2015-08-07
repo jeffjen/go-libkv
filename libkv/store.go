@@ -12,6 +12,8 @@ const (
 	SET
 	DEL
 	EXPIRE
+	GONE
+	GETSET
 )
 
 // Event delivers keyspace changes to registerd Watcher
@@ -122,7 +124,6 @@ func (s *Store) del(iden string) {
 	defer s.Unlock()
 	delete(s.m.store, iden)
 	delete(s.m.index, iden)
-	s.s.src <- &Event{DEL, iden}
 }
 
 // set adds an item to the Store keyspace; sets expiration handler when
@@ -137,31 +138,46 @@ func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 	if exp != nil {
 		id := iden
 		s.m.index[iden] = s.e.SchedFunc(*exp, func() {
+			s.s.src <- &Event{GONE, iden}
 			s.del(id)
-			s.s.src <- &Event{EXPIRE, iden}
 		})
+		s.s.src <- &Event{EXPIRE, iden}
 	}
-	s.s.src <- &Event{SET, iden}
 	return true
 }
 
 // Set puts an aribtrary item x into Store identified by iden
-func (s *Store) Set(iden string, x interface{}) bool {
-	return s.set(iden, x, nil)
+func (s *Store) Set(iden string, x interface{}) (ret bool) {
+	ret = s.set(iden, x, nil)
+	if ret {
+		s.s.src <- &Event{SET, iden}
+	}
+	return
 }
 
 // Set puts an aribtrary item x into Store identified by iden to be expired at
 // exp
-func (s *Store) Setexp(iden string, x interface{}, exp time.Time) bool {
-	return s.set(iden, x, &exp)
+func (s *Store) Setexp(iden string, x interface{}, exp time.Time) (ret bool) {
+	ret = s.set(iden, x, &exp)
+	if ret {
+		s.s.src <- &Event{SET, iden}
+	}
+	return
 }
 
-// Get retrieves an item x identified by iden
-func (s *Store) Get(iden string) (x interface{}) {
+func (s *Store) get(iden string) (x interface{}) {
 	s.RLock()
 	defer s.RUnlock()
 	if obj, ok := s.m.store[iden]; ok {
 		x = obj.x
+	}
+	return
+}
+
+// Get retrieves an item x identified by iden
+func (s *Store) Get(iden string) (x interface{}) {
+	x = s.get(iden)
+	if x != nil {
 		s.s.src <- &Event{GET, iden}
 	}
 	return
@@ -169,8 +185,9 @@ func (s *Store) Get(iden string) (x interface{}) {
 
 // Getset retrieves an item y identified by iden and replace it with item x
 func (s *Store) Getset(iden string, x interface{}) (y interface{}) {
-	y = s.Get(iden)
-	s.Set(iden, x)
+	y = s.get(iden)
+	s.set(iden, x, nil)
+	s.s.src <- &Event{GETSET, iden}
 	return
 }
 
@@ -189,9 +206,9 @@ func (s *Store) TTL(iden string) (in time.Duration) {
 
 // Expire puts item identified by iden to expire at exp
 func (s *Store) Expire(iden string, exp time.Time) bool {
-	x := s.Get(iden)
+	x := s.get(iden)
 	if x != nil {
-		return s.Setexp(iden, x, exp)
+		return s.set(iden, x, &exp)
 	}
 	return false
 }
@@ -199,6 +216,7 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 // Del removes the item identified by iden from Store
 func (s *Store) Del(iden string) {
 	s.del(iden)
+	s.s.src <- &Event{DEL, iden}
 }
 
 // register takes a control object avent and place it into the Wather list in
