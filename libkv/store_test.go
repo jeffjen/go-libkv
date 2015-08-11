@@ -88,6 +88,31 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
+func TestGetExp(t *testing.T) {
+	kv := NewStore()
+	defer kv.Close()
+
+	kv.Set("hello_internet", 1)
+
+	x := kv.Getexp("hello_internet", time.Now().Add(3*time.Second))
+	if x != 1 {
+		t.Errorf("key word: \"hello_internet\" should be set")
+		return
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	kv.Getexp("hello_internet", time.Now().Add(3*time.Second))
+
+	time.Sleep(4 * time.Second)
+
+	x = kv.Get("hello_internet")
+	if x != nil {
+		t.Errorf("key word: \"hello_internet\" unexpected not expire")
+		return
+	}
+}
+
 func TestAcquireTTL(t *testing.T) {
 	kv := NewStore()
 	defer kv.Close()

@@ -197,6 +197,17 @@ func (s *Store) Getset(iden string, x interface{}) (y interface{}) {
 	return
 }
 
+// Getexp retrieves an item x identified by iden and set expiration
+func (s *Store) Getexp(iden string, exp time.Time) (x interface{}) {
+	s.Lock()
+	defer s.Unlock()
+	if x = s.get(iden); x != nil {
+		s.s.src <- &Event{GET, iden}
+		s.expire(iden, exp)
+	}
+	return
+}
+
 // TTL reports the life time left on the item identified by iden
 func (s *Store) TTL(iden string) (in time.Duration) {
 	s.RLock()
