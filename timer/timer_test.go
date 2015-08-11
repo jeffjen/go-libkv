@@ -12,8 +12,8 @@ type Expire struct {
 	wg   *sync.WaitGroup
 }
 
-func (e Expire) Done() {
-	fmt.Printf("triggered expired [%d] - [%s]\n", e.iden, time.Now())
+func (e Expire) Done(jobId int64) {
+	fmt.Printf("triggered expired [%d] - [%d] - [%s]\n", e.iden, jobId, time.Now())
 	e.wg.Done()
 }
 
@@ -80,7 +80,7 @@ func TestBurstSched(t *testing.T) {
 	fmt.Printf("begin TestBurstSched %v\n", now)
 
 	for idx := 0; idx < schedNumHandler; idx += 1 {
-		exp.SchedFunc(now.Add(1*time.Millisecond), func() {
+		exp.SchedFunc(now.Add(1*time.Millisecond), func(jobId int64) {
 			wg.Done()
 		})
 	}
@@ -104,13 +104,13 @@ func TestCancel(t *testing.T) {
 
 	resp := make(chan int, 1)
 
-	iden := exp.SchedFunc(now.Add(10*time.Second), func() {
-		fmt.Printf("work order %d triggered at %v\n", 1, time.Now())
+	iden := exp.SchedFunc(now.Add(10*time.Second), func(id int64) {
+		fmt.Printf("work order [%d;%d] triggered at %v\n", 1, id, time.Now())
 		resp <- 1
 	})
 
-	exp.SchedFunc(now.Add(2*time.Second), func() {
-		fmt.Printf("work order %d triggered at %v\n", 2, time.Now())
+	exp.SchedFunc(now.Add(2*time.Second), func(id int64) {
+		fmt.Printf("work order [%d;%d] triggered at %v\n", 2, id, time.Now())
 		resp <- 2
 	})
 
@@ -140,7 +140,7 @@ func TestUpdate(t *testing.T) {
 
 	resp := make(chan int, 1)
 
-	iden := exp.SchedFunc(now.Add(10*time.Second), func() {
+	iden := exp.SchedFunc(now.Add(10*time.Second), func(jobId int64) {
 		resp <- 1
 	})
 
@@ -166,7 +166,7 @@ func BenchmarkSchedFunc(b *testing.B) {
 
 	const N = 10000
 
-	handle := func() {}
+	handle := func(jobId int64) {}
 
 	future := time.Now().Add(1 * time.Hour)
 

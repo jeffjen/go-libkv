@@ -147,7 +147,7 @@ func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 
 func (s *Store) expire(iden string, exp time.Time) {
 	id := iden
-	s.m.index[iden] = s.e.SchedFunc(exp, func() {
+	s.m.index[iden] = s.e.SchedFunc(exp, func(jobId int64) {
 		s.Lock()
 		defer s.Unlock()
 		s.del(id)

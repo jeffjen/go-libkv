@@ -57,7 +57,7 @@ func (t *Timer) dispatch() {
 		if len(t.pq) > 0 && now.After(t.pq[0].a) {
 			job := heap.Pop(&t.pq).(*ticket)
 			if t.pop(job.iden) {
-				go job.h.Done() // fire the worker on timer
+				go job.h.Done(job.iden) // fire the worker on timer
 			}
 		} else {
 			ok = false
@@ -131,7 +131,7 @@ func (t *Timer) Toc() {
 // SchedFunc accepts time.Time object and a handle function.
 // handle function is invoked in its own goroutine at designated time.
 // Returns an identifier for caller to Cancel or Update.
-func (t *Timer) SchedFunc(c time.Time, handle func()) (iden int64) {
+func (t *Timer) SchedFunc(c time.Time, handle func(int64)) (iden int64) {
 	t.begin, iden = t.begin+1, t.begin
 	t.inn <- &ticket{a: c, h: HandlerFunc(handle), iden: iden}
 	return
