@@ -120,17 +120,21 @@ func (s *Store) Close() {
 
 // del removes an item from the Store keyspace
 func (s *Store) del(iden string) {
-	s.Lock()
-	defer s.Unlock()
 	delete(s.m.store, iden)
 	delete(s.m.index, iden)
+}
+
+// get retrieves an item x identified by iden
+func (s *Store) get(iden string) (x interface{}) {
+	if obj, ok := s.m.store[iden]; ok {
+		x = obj.x
+	}
+	return
 }
 
 // set adds an item to the Store keyspace; sets expiration handler when
 // appropriate
 func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
-	s.Lock()
-	defer s.Unlock()
 	if idx, ok := s.m.index[iden]; ok {
 		s.e.Cancel(idx)
 	}
@@ -148,6 +152,8 @@ func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 
 // Set puts an aribtrary item x into Store identified by iden
 func (s *Store) Set(iden string, x interface{}) (ret bool) {
+	s.Lock()
+	defer s.Unlock()
 	ret = s.set(iden, x, nil)
 	if ret {
 		s.s.src <- &Event{SET, iden}
@@ -158,6 +164,8 @@ func (s *Store) Set(iden string, x interface{}) (ret bool) {
 // Set puts an aribtrary item x into Store identified by iden to be expired at
 // exp
 func (s *Store) Setexp(iden string, x interface{}, exp time.Time) (ret bool) {
+	s.Lock()
+	defer s.Unlock()
 	ret = s.set(iden, x, &exp)
 	if ret {
 		s.s.src <- &Event{SET, iden}
@@ -165,19 +173,11 @@ func (s *Store) Setexp(iden string, x interface{}, exp time.Time) (ret bool) {
 	return
 }
 
-func (s *Store) get(iden string) (x interface{}) {
-	s.RLock()
-	defer s.RUnlock()
-	if obj, ok := s.m.store[iden]; ok {
-		x = obj.x
-	}
-	return
-}
-
 // Get retrieves an item x identified by iden
 func (s *Store) Get(iden string) (x interface{}) {
-	x = s.get(iden)
-	if x != nil {
+	s.RLock()
+	defer s.RUnlock()
+	if x = s.get(iden); x != nil {
 		s.s.src <- &Event{GET, iden}
 	}
 	return
@@ -185,6 +185,8 @@ func (s *Store) Get(iden string) (x interface{}) {
 
 // Getset retrieves an item y identified by iden and replace it with item x
 func (s *Store) Getset(iden string, x interface{}) (y interface{}) {
+	s.Lock()
+	defer s.Unlock()
 	y = s.get(iden)
 	s.set(iden, x, nil)
 	s.s.src <- &Event{GETSET, iden}
@@ -208,7 +210,6 @@ func (s *Store) TTL(iden string) (in time.Duration) {
 func (s *Store) Expire(iden string, exp time.Time) bool {
 	s.Lock()
 	defer s.Unlock()
-
 	if _, ok := s.m.store[iden]; !ok {
 		return false
 	} else {
@@ -224,6 +225,8 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 
 // Del removes the item identified by iden from Store
 func (s *Store) Del(iden string) {
+	s.Lock()
+	defer s.Unlock()
 	s.del(iden)
 	s.s.src <- &Event{DEL, iden}
 }
