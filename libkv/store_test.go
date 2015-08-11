@@ -268,3 +268,45 @@ func TestWatchExtended(t *testing.T) {
 
 	close(later) // kill the second monitor
 }
+
+func TestWatchNotpresent(t *testing.T) {
+	kv := NewStore()
+	defer kv.Close()
+
+	stop := make(chan struct{})
+	p1 := make(chan *Event, 1)
+	go func() {
+		monitor := kv.Watch(stop)
+		p1 <- nil
+		for evt := range monitor {
+			p1 <- evt
+		}
+		close(p1)
+	}()
+
+	<-p1 // oberver ready
+
+	hits := make(chan []int, 1)
+	go func() {
+		evts := make([]int, 0)
+		for c := range p1 {
+			evts = append(evts, c.Action)
+		}
+		hits <- evts
+	}()
+
+	events := []int{SET, GET, DEL}
+
+	kv.Get("where")
+	kv.Set("hello", 1)
+	kv.Del("where")
+	kv.Get("hello")
+	kv.Del("hello")
+
+	time.Sleep(250 * time.Millisecond)
+	close(stop)
+
+	if evts := <-hits; !reflect.DeepEqual(events, evts) {
+		t.Errorf("uexpected event set mismatch")
+	}
+}
