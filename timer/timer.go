@@ -170,6 +170,7 @@ func NewTimer() (t *Timer) {
 	pri := make(priority, 0)
 	heap.Init(&pri)
 	return &Timer{
+		begin:  1, // initialized to positive value
 		state:  IDLE,
 		inn:    make(chan *ticket, 1),
 		sync:   make(chan *ticket, 1),

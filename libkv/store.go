@@ -103,9 +103,10 @@ func NewStore() (s *Store) {
 			index: make(map[string]int64),
 		},
 		s: &kv_avent{
-			src:  make(chan *Event, 1),
-			list: make(map[int64]*avent),
-			halt: make(chan struct{}),
+			src:     make(chan *Event, 1),
+			list:    make(map[int64]*avent),
+			halt:    make(chan struct{}),
+			counter: 1, // initialzed to positive value
 		},
 	}
 	<-s.init() // make sure both scheduler and event hub is running
@@ -119,9 +120,26 @@ func (s *Store) Close() {
 }
 
 // del removes an item from the Store keyspace
-func (s *Store) del(iden string) {
+func (s *Store) del(iden string, jobId int64) bool {
+	// check key exist
+	if _, ok := s.m.store[iden]; !ok {
+		return false
+	}
+
+	// check key job id; if exist then job id must match
+	if jid, ok := s.m.index[iden]; ok && jobId != jid {
+		// jobId will ALWAYS be positve value
+		if jid == -1 {
+			delete(s.m.index, iden)
+		}
+		return false
+	}
+
+	// remove key from store
 	delete(s.m.store, iden)
 	delete(s.m.index, iden)
+
+	return true
 }
 
 // get retrieves an item x identified by iden
@@ -137,6 +155,7 @@ func (s *Store) get(iden string) (x interface{}) {
 func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 	if idx, ok := s.m.index[iden]; ok {
 		s.e.Cancel(idx)
+		s.m.index[iden] = -1 // invalidate any fired expire handler
 	}
 	s.m.store[iden] = thing{x: x, t: exp}
 	if exp != nil {
@@ -150,8 +169,9 @@ func (s *Store) expire(iden string, exp time.Time) {
 	s.m.index[iden] = s.e.SchedFunc(exp, func(jobId int64) {
 		s.Lock()
 		defer s.Unlock()
-		s.del(id)
-		s.s.src <- &Event{GONE, iden}
+		if s.del(id, jobId) {
+			s.s.src <- &Event{GONE, iden}
+		}
 	})
 }
 
@@ -240,8 +260,8 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 func (s *Store) Del(iden string) {
 	s.Lock()
 	defer s.Unlock()
-	if _, ok := s.m.store[iden]; ok {
-		s.del(iden)
+	jobId, _ := s.m.index[iden]
+	if s.del(iden, jobId) {
 		s.s.src <- &Event{DEL, iden}
 	}
 }
