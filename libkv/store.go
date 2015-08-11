@@ -140,14 +140,17 @@ func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 	}
 	s.m.store[iden] = thing{x: x, t: exp}
 	if exp != nil {
-		id := iden
-		s.m.index[iden] = s.e.SchedFunc(*exp, func() {
-			s.s.src <- &Event{GONE, iden}
-			s.del(id)
-		})
-		s.s.src <- &Event{EXPIRE, iden}
+		s.expire(iden, *exp)
 	}
 	return true
+}
+
+func (s *Store) expire(iden string, exp time.Time) {
+	id := iden
+	s.m.index[iden] = s.e.SchedFunc(exp, func() {
+		s.s.src <- &Event{GONE, iden}
+		s.del(id)
+	})
 }
 
 // Set puts an aribtrary item x into Store identified by iden
@@ -169,6 +172,7 @@ func (s *Store) Setexp(iden string, x interface{}, exp time.Time) (ret bool) {
 	ret = s.set(iden, x, &exp)
 	if ret {
 		s.s.src <- &Event{SET, iden}
+		s.s.src <- &Event{EXPIRE, iden}
 	}
 	return
 }
@@ -213,11 +217,7 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 	if _, ok := s.m.store[iden]; !ok {
 		return false
 	} else {
-		id := iden
-		s.m.index[iden] = s.e.SchedFunc(exp, func() {
-			s.s.src <- &Event{GONE, iden}
-			s.del(id)
-		})
+		s.expire(iden, exp)
 		s.s.src <- &Event{EXPIRE, iden}
 		return true
 	}
