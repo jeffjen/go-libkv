@@ -227,8 +227,10 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 func (s *Store) Del(iden string) {
 	s.Lock()
 	defer s.Unlock()
-	s.del(iden)
-	s.s.src <- &Event{DEL, iden}
+	if _, ok := s.m.store[iden]; ok {
+		s.del(iden)
+		s.s.src <- &Event{DEL, iden}
+	}
 }
 
 // register takes a control object avent and place it into the Wather list in
