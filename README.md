@@ -18,6 +18,7 @@ Supported operations
 - Set, Setexp
 - Get
 - Getset
+- Getexp
 - Expire
 - TTL
 - Del
