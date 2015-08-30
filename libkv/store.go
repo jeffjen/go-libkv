@@ -14,6 +14,8 @@ const (
 	EXPIRE
 	GONE
 	GETSET
+	LPUSH
+	LTRIM
 )
 
 // Event delivers keyspace changes to registerd Watcher
@@ -204,7 +206,11 @@ func (s *Store) Get(iden string) (x interface{}) {
 	s.RLock()
 	defer s.RUnlock()
 	if x = s.get(iden); x != nil {
-		s.s.src <- &Event{GET, iden}
+		if _, ok := x.([]thing); !ok {
+			s.s.src <- &Event{GET, iden}
+		} else {
+			x = nil
+		}
 	}
 	return
 }
@@ -264,6 +270,99 @@ func (s *Store) Del(iden string) {
 	if s.del(iden, jobId) {
 		s.s.src <- &Event{DEL, iden}
 	}
+}
+
+// Lpush appends an item to item identified by iden
+// creates new list item
+// returns size of the item after operation; -1 for failed attempt
+func (s *Store) Lpush(iden string, x interface{}) (size int64) {
+	s.Lock()
+	defer s.Unlock()
+	if obj, ok := s.m.store[iden]; !ok {
+		// the "thing" to store is a []thing with one new item
+		s.m.store[iden] = thing{
+			x: []thing{
+				thing{x: x, t: nil},
+			},
+			t: nil,
+		}
+		size = 1
+		s.s.src <- &Event{LPUSH, iden}
+	} else if lobj, ok := obj.x.([]thing); ok {
+		// find the "thing", check that it is a []thing, and append to it
+		lobj = append([]thing{thing{x: x, t: nil}}, lobj...)
+		s.m.store[iden] = thing{x: lobj, t: obj.t}
+		size = int64(len(lobj)) + 1
+		s.s.src <- &Event{LPUSH, iden}
+	} else {
+		size = -1
+	}
+	return
+}
+
+func (s *Store) rangeidx(start, stop, length int64) (begin, end int64) {
+	if start >= length {
+		begin = length
+	} else if start >= 0 && start < length {
+		begin = start
+	} else {
+		begin = length + start
+		if begin < 0 {
+			begin = 0
+		}
+	}
+	if stop >= length {
+		end = length
+	} else if stop >= 0 && stop < length {
+		end = stop
+	} else {
+		end = length + stop + 1
+	}
+	if end < begin {
+		end = begin
+	}
+	return
+}
+
+// Lrange returns a slice of items within start and stop.
+func (s *Store) Lrange(iden string, start, stop int64) (items []interface{}) {
+	s.Lock()
+	defer s.Unlock()
+	if obj, ok := s.m.store[iden]; !ok {
+		items = nil
+	} else if lobj, ok := obj.x.([]thing); !ok {
+		items = nil
+	} else {
+		begin, end := s.rangeidx(start, stop, int64(len(lobj)))
+		for _, obj := range lobj[begin:end] {
+			items = append(items, obj.x)
+		}
+	}
+	return
+}
+
+// Ltrim keeps items specified in start and stop range and remove all other
+// items.
+// start and stop can be negative values.  If the value is -1, it indicates the
+// end of list; if it is greater then the actual length, it is clamped to the
+// boundary beteween 0 and length of item
+// returns size of the item after operation; -1 for failed attempt
+func (s *Store) Ltrim(iden string, start, stop int64) (size int64) {
+	s.Lock()
+	defer s.Unlock()
+	if obj, ok := s.m.store[iden]; !ok {
+		size = -1
+	} else if lobj, ok := obj.x.([]thing); !ok {
+		size = -1
+	} else {
+		begin, end := s.rangeidx(start, stop, int64(len(lobj)))
+		lobj = lobj[begin:end]
+		s.m.store[iden] = thing{x: lobj, t: obj.t}
+		size = int64(len(lobj))
+
+		s.s.src <- &Event{LTRIM, iden}
+	}
+	return
 }
 
 // register takes a control object avent and place it into the Wather list in

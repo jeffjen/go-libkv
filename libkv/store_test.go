@@ -131,6 +131,103 @@ func TestAcquireTTL(t *testing.T) {
 	}
 }
 
+func TestLpush(t *testing.T) {
+	kv := NewStore()
+	defer kv.Close()
+
+	ref := []int{1, 2, 3, 4, 5}
+
+	for idx := len(ref) - 1; idx >= 0; idx-- {
+		kv.Lpush("hello-internet", ref[idx])
+	}
+
+	lobj := kv.Lrange("hello-internet", 0, -1)
+
+	if len(lobj) != len(ref) {
+		t.Errorf("key word: \"hello-internet\" item count does not agree")
+		return
+	}
+
+	for idx := 1; idx < len(ref); idx++ {
+		if lobj[idx] != ref[idx] {
+			t.Errorf("key word: \"hello-internet\" does not agree at %d", idx)
+			fmt.Println(lobj, ref)
+			return
+		}
+	}
+}
+
+func TestLtrim(t *testing.T) {
+	kv := NewStore()
+	defer kv.Close()
+
+	ref := []string{"a", "b", "c", "d", "e"}
+	init := func() {
+		kv.Del("hello-internet")
+		for idx := len(ref) - 1; idx >= 0; idx-- {
+			kv.Lpush("hello-internet", ref[idx])
+		}
+	}
+	verify := func(lobj []interface{}, ref []string) bool {
+		if len(lobj) != len(ref) {
+			t.Errorf("key word: \"hello-internet\" item count does not agree")
+			return false
+		}
+		for idx := 1; idx < len(ref); idx++ {
+			if lobj[idx] != ref[idx] {
+				t.Errorf("key word: \"hello-internet\" does not agree at %d", idx)
+				fmt.Println(lobj, ref)
+				return false
+			}
+		}
+		return true
+	}
+
+	var lobj []interface{}
+
+	init()
+	kv.Ltrim("hello-internet", 1, 3)
+	lobj = kv.Lrange("hello-internet", 0, -1)
+	if !verify(lobj, ref[1:3]) {
+		return
+	}
+
+	init()
+	kv.Ltrim("hello-internet", 1000, 3)
+	lobj = kv.Lrange("hello-internet", 0, -1)
+	if !verify(lobj, ref[len(ref):]) {
+		return
+	}
+
+	init()
+	kv.Ltrim("hello-internet", 5, 100)
+	lobj = kv.Lrange("hello-internet", 0, -1)
+	if !verify(lobj, ref[len(ref):]) {
+		return
+	}
+
+	init()
+	kv.Ltrim("hello-internet", 2, -1)
+	lobj = kv.Lrange("hello-internet", 0, -1)
+	if !verify(lobj, ref[2:]) {
+		return
+	}
+
+	init()
+	kv.Ltrim("hello-internet", -4, -2)
+	lobj = kv.Lrange("hello-internet", 0, -1)
+	if !verify(lobj, ref[1:4]) {
+		return
+	}
+
+	init()
+	kv.Ltrim("hello-internet", -900, -2)
+	lobj = kv.Lrange("hello-internet", 0, -1)
+	if !verify(lobj, ref[:4]) {
+		return
+	}
+}
+
 func TestList(t *testing.T) {
 	kv := NewStore()
 	defer kv.Close()
