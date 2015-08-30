@@ -22,6 +22,9 @@ Supported operations
 - Expire
 - TTL
 - Del
+- Lpush
+- Ltrim
+- Lrange
 - List, Listexp
 - Watch
 
