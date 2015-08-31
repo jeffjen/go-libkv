@@ -404,8 +404,8 @@ func (s *Store) Watch(stop <-chan struct{}) <-chan *Event {
 	return output
 }
 
-// List retrieves the full list of item key in Store.
-func (s *Store) List() (items []string) {
+// Key retrieves the full list of item key in Store.
+func (s *Store) Key() (items []string) {
 	s.RLock()
 	defer s.RUnlock()
 	items = make([]string, len(s.m.store))
@@ -417,8 +417,8 @@ func (s *Store) List() (items []string) {
 	return
 }
 
-// Listexp retrieves the full list of item key in Store that has an expiration.
-func (s *Store) Listexp() (items []string) {
+// Keyexp retrieves the full list of item key in Store that has an expiration.
+func (s *Store) Keyexp() (items []string) {
 	s.RLock()
 	defer s.RUnlock()
 	items = make([]string, len(s.m.index))

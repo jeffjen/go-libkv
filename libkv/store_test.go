@@ -228,7 +228,7 @@ func TestLtrim(t *testing.T) {
 	}
 }
 
-func TestList(t *testing.T) {
+func TestKey(t *testing.T) {
 	kv := NewStore()
 	defer kv.Close()
 
@@ -238,7 +238,7 @@ func TestList(t *testing.T) {
 		kv.Set(fmt.Sprint(idx), idx)
 	}
 
-	k := kv.List()
+	k := kv.Key()
 	if len(k) != N {
 		t.Errorf("unable to list keys stored")
 	} else {
@@ -246,7 +246,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestListexp(t *testing.T) {
+func TestKeyexp(t *testing.T) {
 	kv := NewStore()
 	defer kv.Close()
 
@@ -263,7 +263,7 @@ func TestListexp(t *testing.T) {
 		kv.Set(fmt.Sprint(idx), idx)
 	}
 
-	k := kv.Listexp()
+	k := kv.Keyexp()
 
 	sort.Strings(k)
 
