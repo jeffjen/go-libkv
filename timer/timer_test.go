@@ -158,6 +158,46 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+func TestRepeat(t *testing.T) {
+	exp := NewTimer()
+
+	exp.Tic()
+	defer exp.Toc() // schedule expire worker
+
+	now := time.Now()
+	fmt.Printf("begin TestRepeat %v\n", now)
+
+	resp := make(chan int, 1)
+
+	iden := exp.RepeatFunc(1*time.Second, func(jobId int64) {
+		resp <- 1
+	})
+
+	history, counter := 0, 0
+
+	pre := time.After(5 * time.Second)
+	end := time.After(10 * time.Second)
+	for {
+		select {
+		case <-resp:
+			counter += 1
+		case <-pre:
+			exp.Cancel(iden)
+			if counter == 0 {
+				t.Errorf("Failed to repeat scheduled work")
+			} else {
+				fmt.Printf("work order repated %d times\n", counter)
+			}
+			history = counter
+		case <-end:
+			if history != counter {
+				t.Errorf("Failed to cancel repeat work")
+			}
+			return
+		}
+	}
+}
+
 func BenchmarkSchedFunc(b *testing.B) {
 	exp := NewTimer()
 

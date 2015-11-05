@@ -11,6 +11,9 @@ type ticket struct {
 
 	a time.Time `desc: the designated time to fire Handler`
 	h Handler   `desc: registered handler`
+
+	r bool          `desc: flag for testing whether this is a recurring ticket`
+	d time.Duration `desc: the interval at which we repeat this ticket`
 }
 
 // priority is how we manage scheduling in Timer

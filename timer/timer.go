@@ -33,6 +33,16 @@ type Timer struct {
 	lookup *schedIdx     `desc: lookup table from job id to priority queue index`
 }
 
+func (t *Timer) repeat(job *ticket) (ack bool) {
+	t.lookup.Lock()
+	defer t.lookup.Unlock()
+	if _, ack = t.lookup.i[job.iden]; ack {
+		job.a = time.Now().Add(job.d)
+		heap.Push(&t.pq, job)
+	}
+	return
+}
+
 // pop removes an item for the dispatch lookup table.
 func (t *Timer) pop(iden int64) (ack bool) {
 	t.lookup.Lock()
@@ -56,8 +66,14 @@ func (t *Timer) dispatch() {
 	for ok := true; ok; {
 		if len(t.pq) > 0 && now.After(t.pq[0].a) {
 			job := heap.Pop(&t.pq).(*ticket)
-			if t.pop(job.iden) {
-				go job.h.Done(job.iden) // fire the worker on timer
+			if job.r {
+				if t.repeat(job) {
+					go job.h.Done(job.iden) // fire the worker on timer
+				}
+			} else {
+				if t.pop(job.iden) {
+					go job.h.Done(job.iden) // fire the worker on timer
+				}
 			}
 		} else {
 			ok = false
@@ -126,6 +142,42 @@ func (t *Timer) Toc() {
 	for _ = range t.end {
 	}
 	t.state = STOPPED
+}
+
+// RepeatFunc accepts a duration as interval and a handle function.
+// handle function is invoked in its own goroutine at set interval.
+// Returns an identifier for caller to Cancel.
+//
+// CAUTION: if the interval is set lower relative to handle function, you will
+// have an unbounded number of goroutine
+func (t *Timer) RepeatFunc(d time.Duration, handle func(int64)) (iden int64) {
+	t.begin, iden = t.begin+1, t.begin
+	t.inn <- &ticket{
+		a:    time.Now().Add(d),
+		h:    HandlerFunc(handle),
+		iden: iden,
+		r:    true,
+		d:    d,
+	}
+	return
+}
+
+// Repeat accepts a time.Duration and a Handler interface.
+// handler is invoked in its own goroutine at set interval.
+// Returns an identifier for caller to Cancel.
+//
+// CAUTION: if the interval is set lower relative to handle function, you will
+// have an unbounded number of goroutine
+func (t *Timer) Repeat(d time.Duration, handle Handler) (iden int64) {
+	t.begin, iden = t.begin+1, t.begin
+	t.inn <- &ticket{
+		a:    time.Now().Add(d),
+		h:    handle,
+		iden: iden,
+		r:    true,
+		d:    d,
+	}
+	return
 }
 
 // SchedFunc accepts time.Time object and a handle function.
