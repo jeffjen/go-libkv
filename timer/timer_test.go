@@ -169,7 +169,7 @@ func TestRepeat(t *testing.T) {
 
 	resp := make(chan int, 1)
 
-	iden := exp.RepeatFunc(1*time.Second, func(jobId int64) {
+	iden := exp.RepeatFunc(1*time.Second, 1, func(jobId int64) {
 		resp <- 1
 	})
 
@@ -193,6 +193,37 @@ func TestRepeat(t *testing.T) {
 			if history != counter {
 				t.Errorf("Failed to cancel repeat work")
 			}
+			return
+		}
+	}
+}
+
+func TestRepeatRateLimit(t *testing.T) {
+	exp := NewTimer()
+
+	exp.Tic()
+	defer exp.Toc() // schedule expire worker
+
+	now := time.Now()
+	fmt.Printf("begin TestRepeatRateLimit %v\n", now)
+
+	resp := make(chan int, 1)
+
+	iden := exp.RepeatFunc(1*time.Millisecond, 5, func(jobId int64) {
+		<-time.After(1 * time.Second)
+		resp <- 1
+	})
+
+	counter := 0
+
+	end := time.After(5 * time.Second)
+	for {
+		select {
+		case <-resp:
+			counter += 1
+		case <-end:
+			exp.Cancel(iden)
+			fmt.Printf("Handler invoked: %d times\n", counter)
 			return
 		}
 	}
