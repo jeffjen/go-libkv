@@ -105,7 +105,7 @@ func NewStore() (s *Store) {
 			index: make(map[string]int64),
 		},
 		s: &kv_avent{
-			src:     make(chan *Event, 1),
+			src:     make(chan *Event, 8),
 			list:    make(map[int64]*avent),
 			halt:    make(chan struct{}),
 			counter: 1, // initialzed to positive value
@@ -119,6 +119,12 @@ func NewStore() (s *Store) {
 func (s *Store) Close() {
 	close(s.s.halt)
 	s.e.Toc()
+}
+
+func (s *Store) pushEvent(event ...*Event) {
+	for _, ev := range event {
+		s.s.src <- ev
+	}
 }
 
 // del removes an item from the Store keyspace
@@ -172,7 +178,7 @@ func (s *Store) expire(iden string, exp time.Time) {
 		s.Lock()
 		defer s.Unlock()
 		if s.del(id, jobId) {
-			s.s.src <- &Event{GONE, iden}
+			s.pushEvent(&Event{GONE, iden})
 		}
 	})
 }
@@ -183,7 +189,7 @@ func (s *Store) Set(iden string, x interface{}) (ret bool) {
 	defer s.Unlock()
 	ret = s.set(iden, x, nil)
 	if ret {
-		s.s.src <- &Event{SET, iden}
+		s.pushEvent(&Event{SET, iden})
 	}
 	return
 }
@@ -195,8 +201,7 @@ func (s *Store) Setexp(iden string, x interface{}, exp time.Time) (ret bool) {
 	defer s.Unlock()
 	ret = s.set(iden, x, &exp)
 	if ret {
-		s.s.src <- &Event{SET, iden}
-		s.s.src <- &Event{EXPIRE, iden}
+		s.pushEvent(&Event{SET, iden}, &Event{EXPIRE, iden})
 	}
 	return
 }
@@ -207,7 +212,7 @@ func (s *Store) Get(iden string) (x interface{}) {
 	defer s.RUnlock()
 	if x = s.get(iden); x != nil {
 		if _, ok := x.([]thing); !ok {
-			s.s.src <- &Event{GET, iden}
+			s.pushEvent(&Event{GET, iden})
 		} else {
 			x = nil
 		}
@@ -221,7 +226,7 @@ func (s *Store) Getset(iden string, x interface{}) (y interface{}) {
 	defer s.Unlock()
 	y = s.get(iden)
 	s.set(iden, x, nil)
-	s.s.src <- &Event{GETSET, iden}
+	s.pushEvent(&Event{GETSET, iden})
 	return
 }
 
@@ -230,7 +235,7 @@ func (s *Store) Getexp(iden string, exp time.Time) (x interface{}) {
 	s.Lock()
 	defer s.Unlock()
 	if x = s.get(iden); x != nil {
-		s.s.src <- &Event{GET, iden}
+		s.pushEvent(&Event{GET, iden})
 		s.expire(iden, exp)
 	}
 	return
@@ -257,7 +262,7 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 		return false
 	} else {
 		s.expire(iden, exp)
-		s.s.src <- &Event{EXPIRE, iden}
+		s.pushEvent(&Event{EXPIRE, iden})
 		return true
 	}
 }
@@ -268,7 +273,7 @@ func (s *Store) Del(iden string) {
 	defer s.Unlock()
 	jobId, _ := s.m.index[iden]
 	if s.del(iden, jobId) {
-		s.s.src <- &Event{DEL, iden}
+		s.pushEvent(&Event{DEL, iden})
 	}
 }
 
@@ -287,13 +292,13 @@ func (s *Store) Lpush(iden string, x interface{}) (size int64) {
 			t: nil,
 		}
 		size = 1
-		s.s.src <- &Event{LPUSH, iden}
+		s.pushEvent(&Event{LPUSH, iden})
 	} else if lobj, ok := obj.x.([]thing); ok {
 		// find the "thing", check that it is a []thing, and append to it
 		lobj = append([]thing{thing{x: x, t: nil}}, lobj...)
 		s.m.store[iden] = thing{x: lobj, t: obj.t}
 		size = int64(len(lobj)) + 1
-		s.s.src <- &Event{LPUSH, iden}
+		s.pushEvent(&Event{LPUSH, iden})
 	} else {
 		size = -1
 	}
@@ -359,8 +364,7 @@ func (s *Store) Ltrim(iden string, start, stop int64) (size int64) {
 		lobj = lobj[begin:end]
 		s.m.store[iden] = thing{x: lobj, t: obj.t}
 		size = int64(len(lobj))
-
-		s.s.src <- &Event{LTRIM, iden}
+		s.pushEvent(&Event{LTRIM, iden})
 	}
 	return
 }

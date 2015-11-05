@@ -281,16 +281,9 @@ func TestWatch(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	// set stuff randomly before monitor
-	kv.Set("hello_world", 2)
-	kv.Getset("hello_world", 2)
-	kv.Setexp("hello_world", 2, time.Now().Add(1*time.Second))
-	kv.Set("hello_world", 2)
-
 	p1 := make(chan int, 1)
 	go func() {
 		monitor := kv.Watch(stop)
-		p1 <- 1
 		for _ = range monitor {
 			p1 <- 1
 		}
@@ -299,13 +292,12 @@ func TestWatch(t *testing.T) {
 	p2 := make(chan int, 1)
 	go func() {
 		monitor := kv.Watch(stop)
-		p2 <- 1
 		for _ = range monitor {
 			p2 <- 1
 		}
 	}()
 
-	_, _ = <-p1, <-p2 // wait for monitor process
+	<-time.After(2 * time.Second)
 
 	kv.Set("hello_world", 2)
 
@@ -326,7 +318,7 @@ func TestWatch(t *testing.T) {
 			ok2 = !(idx2 == 6)
 
 		case <-woe:
-			t.Errorf("unable to complete: expected events incomplete")
+			t.Errorf("unable to complete: expected events incomplete: %d; %d", idx1, idx2)
 			return
 		}
 	}
@@ -340,7 +332,6 @@ func TestWatchExtended(t *testing.T) {
 	p1 := make(chan int, 1)
 	go func() {
 		monitor := kv.Watch(stop)
-		p1 <- 1
 		for _ = range monitor {
 			p1 <- 1
 		}
@@ -350,13 +341,12 @@ func TestWatchExtended(t *testing.T) {
 	p2 := make(chan int, 1)
 	go func() {
 		monitor := kv.Watch(later)
-		p2 <- 1
 		for _ = range monitor {
 			p2 <- 1
 		}
 	}()
 
-	_, _ = <-p1, <-p2 // wait for monitor process
+	<-time.After(2 * time.Second)
 
 	kv.Set("hello_world", 2)
 
@@ -399,14 +389,13 @@ func TestWatchNotpresent(t *testing.T) {
 	p1 := make(chan *Event, 1)
 	go func() {
 		monitor := kv.Watch(stop)
-		p1 <- nil
 		for evt := range monitor {
 			p1 <- evt
 		}
 		close(p1)
 	}()
 
-	<-p1 // oberver ready
+	<-time.After(1 * time.Second)
 
 	hits := make(chan []int, 1)
 	go func() {
@@ -429,6 +418,6 @@ func TestWatchNotpresent(t *testing.T) {
 	close(stop)
 
 	if evts := <-hits; !reflect.DeepEqual(events, evts) {
-		t.Errorf("uexpected event set mismatch")
+		t.Errorf("uexpected event set mismatch %v", evts)
 	}
 }
