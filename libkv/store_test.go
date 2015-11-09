@@ -430,6 +430,12 @@ func TestSaveLoad(t *testing.T) {
 	kv.Set("hello_world", 1)
 	kv.Setexp("hello_bogus", "random string 3", time.Now().Add(3*time.Second))
 	kv.Set("hello_rant", 1.23543)
+	kv.Lpush("hello_blurp", "A")
+	kv.Lpush("hello_blurp", "B")
+	kv.Lpush("hello_blurp", "C")
+	kv.Lpush("hello_blurp", 1)
+	kv.Lpush("hello_blurp", 2)
+	kv.Lpush("hello_blurp", 3)
 
 	fmt.Println(kv.Get("hello_bogus"))
 
@@ -459,5 +465,10 @@ func TestSaveLoad(t *testing.T) {
 	}
 	if d, ok := kv.Get("hello_rant").(float64); !ok {
 		t.Errorf("Data mismatch; expect float, got `%v`", d)
+	}
+	if d := kv.Lrange("hello_blurp", 0, -1); d == nil || len(d) != 6 {
+		t.Errorf("Data mismatch; expect list, got `%v`", d)
+	} else {
+		fmt.Println(d)
 	}
 }

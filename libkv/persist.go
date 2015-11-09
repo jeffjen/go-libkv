@@ -19,6 +19,11 @@ var (
 	g sync.Mutex
 )
 
+func init() {
+	gob.Register([]thing{})
+	gob.Register(thing{})
+}
+
 func Load(path string) (*Store, error) {
 	g.Lock()
 	defer g.Unlock()
