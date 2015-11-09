@@ -24,6 +24,9 @@ func init() {
 	gob.Register(thing{})
 }
 
+// Load restores kv object from file.
+// Method is protected by mutex to prevent multiple Load job.
+// NOTE: this is an experimental feature
 func Load(path string) (*Store, error) {
 	g.Lock()
 	defer g.Unlock()
@@ -61,10 +64,15 @@ func Load(path string) (*Store, error) {
 }
 
 // Save stores the kv object and kv index object to designated path
+// kv object is put under read lock to prevent changes
+// Method is protected by mutex to prevent multiple Save job.
 // NOTE: this is an experimental feature.  Method best invoked in goroutine
 func (s *Store) Save(path string) error {
 	s.RLock()
 	defer s.RUnlock()
+
+	g.Lock()
+	defer g.Unlock()
 
 	if fp, err := os.Create(p.Join(path, KV_FILE)); err != nil {
 		return err

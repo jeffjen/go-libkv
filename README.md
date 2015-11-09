@@ -13,7 +13,7 @@ An embedded framework for handling key value written in pure golang.
 
 Embedded In memory **volatile** KV storage inspired by [REDIS](http://redis.io/).
 
-Supported operations
+### Supported operations
 
 - Set, Setexp
 - Get
@@ -27,6 +27,15 @@ Supported operations
 - Lrange
 - List, Listexp
 - Watch
+
+### Experimental feature:
+Snapshot creation truncates current kv file object, so no version support.
+
+- Save  
+    Takes a snapshot of the current kv object to disk.  The rule of encoding
+follows golang package [gob](https://golang.org/pkg/encoding/gob/).
+- Load  
+    Loads snapshot from disk.
 
 ## timer
 
