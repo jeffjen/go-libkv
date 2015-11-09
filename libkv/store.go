@@ -3,6 +3,7 @@ package libkv
 
 import (
 	expire "github.com/jeffjen/go-libkv/timer"
+
 	"sync"
 	"time"
 )
@@ -42,8 +43,8 @@ type kv_avent struct {
 
 // thing is an object stored in Store
 type thing struct {
-	x interface{} `desc: the object to store`
-	t *time.Time  `desc: the expiration date on this thing`
+	X interface{} `desc: the object to store`
+	T *time.Time  `desc: the expiration date on this thing`
 }
 
 // store is the actual KV store
@@ -153,7 +154,7 @@ func (s *Store) del(iden string, jobId int64) bool {
 // get retrieves an item x identified by iden
 func (s *Store) get(iden string) (x interface{}) {
 	if obj, ok := s.m.store[iden]; ok {
-		x = obj.x
+		x = obj.X
 	}
 	return
 }
@@ -165,7 +166,7 @@ func (s *Store) set(iden string, x interface{}, exp *time.Time) bool {
 		s.e.Cancel(idx)
 		s.m.index[iden] = -1 // invalidate any fired expire handler
 	}
-	s.m.store[iden] = thing{x: x, t: exp}
+	s.m.store[iden] = thing{X: x, T: exp}
 	if exp != nil {
 		s.expire(iden, *exp)
 	}
@@ -245,8 +246,8 @@ func (s *Store) Getexp(iden string, exp time.Time) (x interface{}) {
 func (s *Store) TTL(iden string) (in time.Duration) {
 	s.RLock()
 	defer s.RUnlock()
-	if obj, ok := s.m.store[iden]; ok && obj.t != nil {
-		in = obj.t.Sub(time.Now())
+	if obj, ok := s.m.store[iden]; ok && obj.T != nil {
+		in = obj.T.Sub(time.Now())
 		if in < 0 {
 			in = time.Duration(0)
 		}
@@ -286,17 +287,17 @@ func (s *Store) Lpush(iden string, x interface{}) (size int64) {
 	if obj, ok := s.m.store[iden]; !ok {
 		// the "thing" to store is a []thing with one new item
 		s.m.store[iden] = thing{
-			x: []thing{
-				thing{x: x, t: nil},
+			X: []thing{
+				thing{X: x, T: nil},
 			},
-			t: nil,
+			T: nil,
 		}
 		size = 1
 		s.pushEvent(&Event{LPUSH, iden})
-	} else if lobj, ok := obj.x.([]thing); ok {
+	} else if lobj, ok := obj.X.([]thing); ok {
 		// find the "thing", check that it is a []thing, and append to it
-		lobj = append([]thing{thing{x: x, t: nil}}, lobj...)
-		s.m.store[iden] = thing{x: lobj, t: obj.t}
+		lobj = append([]thing{thing{X: x, T: nil}}, lobj...)
+		s.m.store[iden] = thing{X: lobj, T: obj.T}
 		size = int64(len(lobj)) + 1
 		s.pushEvent(&Event{LPUSH, iden})
 	} else {
@@ -335,12 +336,12 @@ func (s *Store) Lrange(iden string, start, stop int64) (items []interface{}) {
 	defer s.Unlock()
 	if obj, ok := s.m.store[iden]; !ok {
 		items = nil
-	} else if lobj, ok := obj.x.([]thing); !ok {
+	} else if lobj, ok := obj.X.([]thing); !ok {
 		items = nil
 	} else {
 		begin, end := s.rangeidx(start, stop, int64(len(lobj)))
 		for _, obj := range lobj[begin:end] {
-			items = append(items, obj.x)
+			items = append(items, obj.X)
 		}
 	}
 	return
@@ -357,12 +358,12 @@ func (s *Store) Ltrim(iden string, start, stop int64) (size int64) {
 	defer s.Unlock()
 	if obj, ok := s.m.store[iden]; !ok {
 		size = -1
-	} else if lobj, ok := obj.x.([]thing); !ok {
+	} else if lobj, ok := obj.X.([]thing); !ok {
 		size = -1
 	} else {
 		begin, end := s.rangeidx(start, stop, int64(len(lobj)))
 		lobj = lobj[begin:end]
-		s.m.store[iden] = thing{x: lobj, t: obj.t}
+		s.m.store[iden] = thing{X: lobj, T: obj.T}
 		size = int64(len(lobj))
 		s.pushEvent(&Event{LTRIM, iden})
 	}

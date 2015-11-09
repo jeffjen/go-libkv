@@ -421,3 +421,43 @@ func TestWatchNotpresent(t *testing.T) {
 		t.Errorf("uexpected event set mismatch %v", evts)
 	}
 }
+
+func TestSaveLoad(t *testing.T) {
+	kv := NewStore()
+	defer kv.Close()
+
+	kv.Set("hello_internet", "random string 1")
+	kv.Set("hello_world", 1)
+	kv.Setexp("hello_bogus", "random string 3", time.Now().Add(3*time.Second))
+	kv.Set("hello_rant", 1.23543)
+
+	fmt.Println(kv.Get("hello_bogus"))
+
+	if err := kv.Save("/tmp"); err != nil {
+		t.Error(err)
+		return
+	}
+
+	<-time.After(5 * time.Second)
+
+	if nkv, err := Load("/tmp"); err != nil {
+		t.Error(err)
+		return
+	} else {
+		kv = nkv
+	}
+	defer kv.Close()
+
+	if d, ok := kv.Get("hello_internet").(string); !ok || d != "random string 1" {
+		t.Errorf("Data mismatch; expect `random string 1`, got `%v`", d)
+	}
+	if d, ok := kv.Get("hello_world").(int); !ok || d != 1 {
+		t.Errorf("Data mismatch; expect `1`, got `%v`", d)
+	}
+	if d := kv.Get("hello_bogus"); d != nil {
+		t.Errorf("Data mismatch; expect object expired, got `%v`", d)
+	}
+	if d, ok := kv.Get("hello_rant").(float64); !ok {
+		t.Errorf("Data mismatch; expect float, got `%v`", d)
+	}
+}
