@@ -434,3 +434,13 @@ func (s *Store) Keyexp() (items []string) {
 	}
 	return
 }
+
+// Iterate goes through the key set calles the provided handler with key and
+// value
+func (s *Store) IterateFunc(do func(string, interface{})) {
+	s.RLock()
+	defer s.RUnlock()
+	for k, v := range s.m.store {
+		do(k, v.X)
+	}
+}
