@@ -151,6 +151,13 @@ func (s *Store) del(iden string, jobId int64) bool {
 	return true
 }
 
+func (s *Store) del_main(iden string) {
+	jobId, _ := s.m.index[iden]
+	if s.del(iden, jobId) {
+		s.pushEvent(&Event{DEL, iden})
+	}
+}
+
 // get retrieves an item x identified by iden
 func (s *Store) get(iden string) (x interface{}) {
 	if obj, ok := s.m.store[iden]; ok {
@@ -272,10 +279,7 @@ func (s *Store) Expire(iden string, exp time.Time) bool {
 func (s *Store) Del(iden string) {
 	s.Lock()
 	defer s.Unlock()
-	jobId, _ := s.m.index[iden]
-	if s.del(iden, jobId) {
-		s.pushEvent(&Event{DEL, iden})
-	}
+	s.del_main(iden)
 }
 
 // Lpush appends an item to item identified by iden
@@ -435,12 +439,44 @@ func (s *Store) Keyexp() (items []string) {
 	return
 }
 
-// Iterate goes through the key set calles the provided handler with key and
-// value
-func (s *Store) IterateFunc(do func(string, interface{})) {
-	s.RLock()
-	defer s.RUnlock()
-	for k, v := range s.m.store {
-		do(k, v.X)
-	}
+type Value struct {
+	K string
+	X interface{}
+	R bool
+}
+
+// IterateW provides iteration construct to loop over key set and modify
+func (s *Store) IterateW() (it <-chan *Value, mod chan<- *Value) {
+	iterator, modify := make(chan *Value), make(chan *Value)
+	go func() {
+		defer close(iterator)
+		s.Lock()
+		defer s.Unlock()
+		for k, v := range s.m.store {
+			iterator <- &Value{k, v.X, false}
+			vv, ok := <-modify
+			if ok {
+				if vv.R {
+					s.del_main(k)
+				} else {
+					s.set(k, vv.X, v.T)
+				}
+			}
+		}
+	}()
+	return iterator, modify
+}
+
+// IterateR provides iteration construct to loop over key in read only mode
+func (s *Store) IterateR() (it <-chan *Value) {
+	iterator := make(chan *Value)
+	go func() {
+		defer close(iterator)
+		s.RLock()
+		defer s.RUnlock()
+		for k, v := range s.m.store {
+			iterator <- &Value{k, v.X, false}
+		}
+	}()
+	return iterator
 }
