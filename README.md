@@ -2,6 +2,7 @@
 [![license](http://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/jeffjen/go-libkv/master/LICENSE)
 [![GoDoc](https://godoc.org/github.com/jeffjen/go-libkv?status.png)](https://godoc.org/github.com/jeffjen/go-libkv)
 [![Build Status](https://travis-ci.org/jeffjen/go-libkv.svg?branch=master)](https://travis-ci.org/jeffjen/go-libkv)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/jeffjen/go-libkv?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 An embedded framework for handling key value written in pure golang.
 
@@ -36,6 +37,12 @@ Snapshot creation truncates current kv file object, so no version support.
 follows golang package [gob](https://golang.org/pkg/encoding/gob/).
 - Load  
     Loads snapshot from disk.
+
+- IterateR  
+    Move alone the keyspace and retrieve key value
+
+- IterateW  
+    Move alone the keyspace and send modify instructions along
 
 ## timer
 
